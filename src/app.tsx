@@ -1,14 +1,14 @@
 // @refresh reload
-import { MetaProvider, Title } from "@solidjs/meta";
-import { cache, Router } from "@solidjs/router";
+import { MetaProvider } from "@solidjs/meta";
+import { query, Router } from "@solidjs/router";
 import { FileRoutes } from "@solidjs/start/router";
 import { Suspense, type ParentProps } from "solid-js";
 import { getRequestEvent } from "solid-js/web";
 import { getSession, type AuthSession } from "start-authjs";
-import "./app.css";
 import { authConfig } from "~/server/auth";
+import "./app.css";
 
-export const getSessionData = cache(async (): Promise<AuthSession | null> => {
+export const getSessionData = query(async (): Promise<AuthSession | null> => {
   "use server";
   const event = getRequestEvent();
   if (!event) return null;

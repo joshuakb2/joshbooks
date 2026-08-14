@@ -18,8 +18,10 @@
         name = "joshbooks";
         buildInputs = with pkgs; [ nodejs_24 ];
         packages = with pkgs; [
-          typescript-language-server
           eslint_d
+          postgresql
+          typescript-language-server
+          vscode-langservers-extracted
         ];
       };
   };

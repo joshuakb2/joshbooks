@@ -5,6 +5,10 @@ export const serverScheme = z.object({
   GOOGLE_ID: z.string(),
   GOOGLE_SECRET: z.string(),
   AUTH_SECRET: z.string(),
+  PG_HOSTNAME: z.string(),
+  PG_USERNAME: z.string(),
+  PG_PASSWORD: z.string(),
+  PG_DATABASE: z.string(),
   AUTH_TRUST_HOST: z.string().optional(),
   AUTH_URL: z.string().optional(),
 });
