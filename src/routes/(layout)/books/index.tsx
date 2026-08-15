@@ -1,31 +1,12 @@
 import { Title } from "@solidjs/meta";
-import { A, action, createAsync, query, useAction } from "@solidjs/router";
+import { A, action, createAsync, useAction } from "@solidjs/router";
 import { assertNever } from '~/util';
 import { createSignal, For, Show } from "solid-js";
-import { getSessionData } from "~/app";
 import { useModal } from "~/components/Modal";
-import { createNewBook, deleteBook, getBooksForUser } from "~/server/db";
-
-const getBooksForUserQuery = query(async () => {
-  'use server';
-
-  const session = await getSessionData();
-  if (!session?.user?.id) return null;
-
-  return await getBooksForUser(session.user.id);
-}, 'books-for-user');
-
-const createNewBookAction = action(async ({ name }: Omit<Parameters<typeof createNewBook>[0], 'owner'>) => {
-  'use server';
-
-  const session = await getSessionData();
-  if (!session?.user?.id) return;
-
-  return await createNewBook({
-    name,
-    owner: session.user.id,
-  });
-}, 'create-new-book');
+import { deleteBook } from "~/server/db";
+import { createNewBook } from "~/actions/createNewBook";
+import { getBooksForUser } from "~/queries/getBooksForUser";
+import { getSessionData } from "~/queries/getSessionData";
 
 const deleteBookAction = action(async (id: number) => {
   'use server';
@@ -40,8 +21,8 @@ const deleteBookAction = action(async (id: number) => {
 }, 'delete-book');
 
 export default function BooksPage() {
-  const books = createAsync(() => getBooksForUserQuery());
-  const createNewBook = useAction(createNewBookAction);
+  const books = createAsync(() => getBooksForUser());
+  const createBook = useAction(createNewBook);
   const deleteBook = useAction(deleteBookAction);
   const { modal, showModal } = useModal();
 
@@ -73,7 +54,7 @@ export default function BooksPage() {
     switch (answer) {
       case 'cancel': return;
       case 'accept':
-        await createNewBook(result);
+        await createBook(result);
         break;
       default:
         return assertNever(answer);

@@ -1,6 +1,6 @@
 import { createAsync } from "@solidjs/router";
 import { Show, Suspense, type VoidComponent } from "solid-js";
-import { getSessionData } from "~/app";
+import { getSessionData } from "~/queries/getSessionData";
 
 const Home: VoidComponent = () => {
   return (

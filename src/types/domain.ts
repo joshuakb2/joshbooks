@@ -17,6 +17,11 @@ export type AccountType = z.infer<typeof accountTypeParser>;
 export const isAccountType = (x: unknown): x is AccountType => accountTypeParser.safeParse(x).success;
 
 /**
+ * Matches entry_type enum in SQL
+ */
+export type EntryType = 'debit' | 'credit';
+
+/**
  * Matches book_access enum in SQL
  */
 export type BookAccess = 'read' | 'write' | 'owner';

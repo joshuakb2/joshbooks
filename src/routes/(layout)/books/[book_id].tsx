@@ -1,130 +1,20 @@
 import { Title } from "@solidjs/meta";
-import { action, createAsync, query, useAction, useParams } from "@solidjs/router";
+import { A, createAsync, useAction, useParams } from "@solidjs/router";
 import { type Component, createSignal, For, Show, type VoidComponent, createMemo } from "solid-js";
-import { getSessionData } from "~/app";
+import { createNewAccount } from "~/actions/createNewAccount";
 import { useModal } from "~/components/Modal";
-import { type Commodity, getBookData, getCommodities, getAccounts, createNewAccount } from "~/server/db";
-import type { Decimal } from "~/types/decimal";
-import * as decimal from "~/types/decimal";
-import { type AccountType, formatCommodity } from "~/types/domain";
+import type { Account } from "~/queries/getAccounts";
+import { getAccounts } from "~/queries/getAccounts";
+import { getBookData } from "~/queries/getBookData";
+import { getCommodities } from "~/queries/getCommodities";
+import type { Commodity } from "~/server/db";
+import { formatCommodity } from "~/types/domain";
 import { assertNever } from "~/util";
-
-const getBookDataQuery = query(async (id: number) => {
-  'use server';
-
-  const session = await getSessionData();
-  if (!session?.user?.id) return null;
-
-  return await getBookData({
-    book_id: id,
-    user_id: session.user.id,
-  });
-}, 'get-book-data');
-
-const getCommoditiesQuery = query(async () => {
-  'use server;'
-
-  return await getCommodities();
-}, 'get-commodities');
-
-type Account = {
-  id: number;
-  name: string;
-  type: AccountType;
-  number: number | null;
-  balance: Decimal;
-  commodity: Commodity;
-  children: Account[];
-  parent: Account | null;
-};
-
-const getAccountsQuery = query(async (book_id: number) => {
-  'use server';
-
-  const session = await getSessionData();
-  if (!session?.user?.id) return null;
-
-  const commodities = await getCommoditiesQuery();
-  const accountRows = await getAccounts({ book_id, user_id: session.user.id });
-
-  const accounts: Account[] = [];
-
-  while (accountRows.length > 0) {
-    for (let i = 0; i < accountRows.length; i++) {
-      const row = accountRows[i];
-      const parentId = row.parent;
-
-      // If this account has no parent, we can add it to the list directly
-      if (!parentId) {
-        const commodity = commodities.find(x => x.id === row.commodity);
-        if (!commodity) throw new Error('Invalid commodity ID');
-
-        accountRows.splice(i, 1);
-        i--;
-        accounts.push({
-          id: row.id,
-          name: row.name,
-          type: row.type,
-          number: row.number,
-          commodity,
-          balance: row.balance,
-          parent: null,
-          children: [],
-        });
-        continue;
-      }
-
-      const parent = accounts.find(x => x.id === parentId);
-      // If we haven't added this account's parent yet, we'll come back to it later
-      if (!parent) continue;
-
-      const commodity = commodities.find(x => x.id === row.commodity);
-      if (!commodity) throw new Error('Invalid commodity ID');
-
-      accountRows.splice(i, 1);
-      i--;
-      parent.children.push({
-        id: row.id,
-        name: row.name,
-        type: row.type,
-        number: row.number,
-        commodity,
-        balance: row.balance,
-        parent: null,
-        children: [],
-      });
-    }
-  }
-
-  const sumBalances = (account: Account) => {
-    for (const child of account.children) {
-      account.balance = decimal.add(account.balance, sumBalances(child));
-    }
-
-    return account.balance;
-  };
-
-  // Sum up account balances
-  for (const account of accounts) {
-    sumBalances(account);
-  }
-
-  return accounts;
-}, 'get-accounts');
-
-const createNewAccountAction = action(async (args: Omit<Parameters<typeof createNewAccount>[0], 'user_id'>) => {
-  'use server';
-
-  const session = await getSessionData();
-  if (!session?.user?.id) return null;
-
-  return await createNewAccount({ ...args, user_id: session.user.id });
-}, 'create-new-account');
 
 const BookPage: VoidComponent = () => {
   const params = useParams();
   const bookId = () => +(params.book_id ?? '');
-  const bookData = createAsync(() => getBookDataQuery(bookId()));
+  const bookData = createAsync(() => getBookData(bookId()));
 
   const loadedBookData = () => {
     const data = bookData();
@@ -147,9 +37,9 @@ type AccountListRootProps = {
 };
 
 const Accounts: Component<AccountListRootProps> = props => {
-  const accounts = createAsync(() => getAccountsQuery(props.bookId));
-  const commodities = createAsync(() => getCommoditiesQuery());
-  const createNewAccount = useAction(createNewAccountAction);
+  const accounts = createAsync(() => getAccounts(props.bookId));
+  const commodities = createAsync(() => getCommodities());
+  const createAccount = useAction(createNewAccount);
 
   const { modal, showModal } = useModal();
 
@@ -214,7 +104,7 @@ const Accounts: Component<AccountListRootProps> = props => {
     switch (answer) {
       case 'cancel': return;
       case 'accept':
-        await createNewAccount({
+        await createAccount({
           book_id: props.bookId,
           ...result,
         });
@@ -246,7 +136,7 @@ const AccountList: Component<AccountListProps> = props => {
     <ul>
       <For each={props.accounts}>
         {account => <li class='list-disc ml-7'>
-          {account.name} ({formatCommodity(account.balance, account.commodity.format)})
+          {account.name} ({formatCommodity(account.balance, account.commodity.format)}) (<A href={`./acct/${account.id}`}>edit</A>)
           <AccountList accounts={account.children} />
         </li>}
       </For>

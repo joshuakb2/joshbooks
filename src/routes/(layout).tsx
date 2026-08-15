@@ -1,6 +1,6 @@
 import { A, createAsync } from "@solidjs/router";
 import { Show, type Component, type JSX } from "solid-js";
-import { getSessionData } from "~/app";
+import { getSessionData } from "~/queries/getSessionData";
 
 const StandardLayout: Component<{ children: JSX.Element }> = props => {
   const session = createAsync(() => getSessionData());
