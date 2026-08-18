@@ -23,6 +23,7 @@ export const authConfig: StartAuthJSConfig = {
   ],
   debug: true,
   basePath: new URL(serverEnv.AUTH_URL!).pathname,
+  trustHost: true,
   callbacks: {
     jwt: async ({ token, account }) => {
       const { access_token, refresh_token } = account ?? {};
