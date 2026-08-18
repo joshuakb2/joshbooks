@@ -1,5 +1,4 @@
-'use server';
-
+import { useStorage } from 'nitro/storage';
 import postgres from 'postgres';
 import { serverEnv } from '~/env/server';
 
@@ -10,6 +9,22 @@ const sql = postgres({
   db: serverEnv.PG_DATABASE,
   debug: true,
 });
+
+export const init = async () => {
+  console.log('Initializing database');
+  try {
+    const initScript = await useStorage('assets:server').get('db_init.sql') as string;
+
+    // Transaction necessary for the postgres library to allow the init script to use BEGIN...COMMIT
+    await sql.begin(async sql => {
+      await sql.unsafe(initScript).simple();
+    });
+    console.log('Database initialized');
+  }
+  catch (e) {
+    console.log('Failed to initialize database:', e);
+  }
+};
 
 export type BookData = {
   id: number;

@@ -1,5 +1,8 @@
 import { createHandler, StartServer } from "@solidjs/start/server";
 import './moduleAugmentation';
+import * as db from './server/db';
+
+await db.init();
 
 export default createHandler(() => (
   <StartServer
