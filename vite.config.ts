@@ -11,4 +11,5 @@ export default defineConfig({
   ],
   dev: { sourcemap: true },
   clearScreen: false,
+  envDir: process.env.ENV_DIR,
 });
