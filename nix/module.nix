@@ -1,7 +1,6 @@
 { self }:
-{ config, pkgs, ... }:
+{ config, pkgs, lib, ... }:
 let
-  inherit (pkgs) lib;
   cfg = config.services.joshbooks;
 in
 {
