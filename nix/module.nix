@@ -25,15 +25,12 @@ in
       description = "joshbooks web server";
       after = [ "network.target" ];
       wantedBy = [ "multi-user.target" ];
-      environment.ENV_DIR = pkgs.runCommand "joshbooks-cwd" { } ''
-        mkdir $out
-        ln -s ${cfg.env} $out/.env
-      '';
 
       serviceConfig = {
         Type = "simple";
         ExecStart = "${cfg.package}/bin/joshbooks";
         Restart = "on-failure";
+        EnvironmentFile = cfg.env;
       };
     };
   };
