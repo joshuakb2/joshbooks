@@ -1,14 +1,12 @@
 import { query } from "@solidjs/router";
-import { getBooksForUser } from "~/server/db";
+import * as db from "~/server/db";
 import { getSessionData } from "./getSessionData";
 
-const getBooksForUserQuery = query(async () => {
+export const getBooksForUser = query(async () => {
   'use server';
 
   const session = await getSessionData();
   if (!session?.user?.id) return null;
 
-  return await getBooksForUser(session.user.id);
+  return await db.getBooksForUser(session.user.id);
 }, 'books-for-user');
-
-export { getBooksForUserQuery as getBooksForUser };

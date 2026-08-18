@@ -11,6 +11,7 @@ export const serverScheme = z.object({
   PG_DATABASE: z.string(),
   AUTH_TRUST_HOST: z.string().optional(),
   AUTH_URL: z.string().optional(),
+  FILES_ROOT: z.string(),
 });
 
 export const clientScheme = z.object({

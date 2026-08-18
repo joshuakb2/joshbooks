@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { decimal } from "~/types/decimal";
-import { formatCommodity } from "~/types/domain";
+import { formatCommodity } from "~/types/book";
 
 describe('formatCommodity', () => {
   const DOLLAR_FORMAT = '$0.00';

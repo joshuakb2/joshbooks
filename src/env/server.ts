@@ -14,11 +14,9 @@ export const formatErrors = (
 const env = serverScheme.safeParse(process.env);
 
 if (env.success === false) {
-  console.error(
-    "❌ Invalid environment variables:\n",
-    ...formatErrors(env.error.format())
+  throw new Error(
+    "Invalid environment variables:\n" + formatErrors(env.error.format()).join('')
   );
-  throw new Error("Invalid environment variables");
 }
 
 export const serverEnv = env.data;

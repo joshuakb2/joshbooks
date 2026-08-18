@@ -1,15 +1,18 @@
+import z from "zod";
 import { curry, mod } from "~/util";
 
-export type Decimal = {
+export const parser = z.object({
   /**
    * significand (integer)
    */
-  n: number;
+  n: z.number(),
   /**
    * exponent (base 10)
    */
-  e: number;
-};
+  e: z.number(),
+});
+
+export type Decimal = z.infer<typeof parser>;
 
 export const format = ({ n, e }: Decimal) => {
   let negative = false;

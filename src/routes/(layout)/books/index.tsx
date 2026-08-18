@@ -1,28 +1,18 @@
+import { createEffect, createSignal, For, Show } from "solid-js";
 import { Title } from "@solidjs/meta";
-import { A, action, createAsync, useAction } from "@solidjs/router";
+import { A, createAsync, useAction } from "@solidjs/router";
 import { assertNever } from '~/util';
-import { createSignal, For, Show } from "solid-js";
 import { useModal } from "~/components/Modal";
-import { deleteBook } from "~/server/db";
-import { createNewBook } from "~/actions/createNewBook";
 import { getBooksForUser } from "~/queries/getBooksForUser";
-import { getSessionData } from "~/queries/getSessionData";
-
-const deleteBookAction = action(async (id: number) => {
-  'use server';
-
-  const session = await getSessionData();
-  if (!session?.user?.id) return;
-
-  return await deleteBook({
-    book_id: id,
-    user_id: session.user.id,
-  });
-}, 'delete-book');
+import { getHasIdentity } from "~/queries/getHasIdentity";
+import { createNewBookAction } from "~/actions/createNewBook";
+import { deleteBookAction } from "~/actions/deleteBook";
+import { createIdentityAction } from "~/actions/createIdentity";
+import { deleteIdentityAction } from "~/actions/deleteIdentity";
 
 export default function BooksPage() {
   const books = createAsync(() => getBooksForUser());
-  const createBook = useAction(createNewBook);
+  const createNewBook = useAction(createNewBookAction);
   const deleteBook = useAction(deleteBookAction);
   const { modal, showModal } = useModal();
 
@@ -54,37 +44,68 @@ export default function BooksPage() {
     switch (answer) {
       case 'cancel': return;
       case 'accept':
-        await createBook(result);
+        await createNewBook(result);
         break;
       default:
         return assertNever(answer);
     }
   };
 
+  const hasIdentity = createAsync(() => getHasIdentity());
+  const createIdentity = useAction(createIdentityAction);
+  const deleteIdentity = useAction(deleteIdentityAction);
+
+  const showCreateIdentityModal = async () => {
+    const [answer] = await showModal({
+      title: 'Missing cryptographic identity',
+      content: 'You don\'t have a cryptographic identity yet, which is necessary to keep your financial data secure.',
+      options: ['Create identity'],
+    });
+
+    switch (answer) {
+      case 'Create identity': break;
+      default: return assertNever(answer);
+    }
+
+    await createIdentity();
+  };
+
+  createEffect(() => {
+    const hasId = hasIdentity();
+    if (hasId === false) {
+      showCreateIdentityModal();
+    }
+  });
+
   return <>
     <Title>Your Books</Title>
     <h1 class='font-bold text-2xl text-center m-3'>Your Books</h1>
-    <Show
-      when={books()}
-      fallback='Loading...'
-    >{
-      books =>
-        <ul>
-          <For
-            each={books()}
-            fallback={<li>You have no books available.</li>}
-          >{
-            book => <li>
-              {book.id} ({JSON.stringify(book.name)}) owned by {book.owner}: {book.access}
-              <button class='btn btn-sm btn-link'><A href={`/books/${book.id}`}>Open</A></button>
-              <button class='btn btn-sm btn-error' onClick={areYouSure(() => deleteBook(book.id))}>Delete</button>
-            </li>
-          }</For>
-        </ul>
-    }</Show>
-    <button class='btn btn-sm btn-primary' onClick={showCreateBookModal}>
-      Create new book
-    </button>
+    <div class="w-full text-center">
+      <Show
+        when={books()}
+        fallback='Loading...'
+      >{
+        books =>
+          <ul>
+            <For
+              each={books()}
+              fallback={<li>You have no books available.</li>}
+            >{
+              book => <li>
+                {book.id} ({JSON.stringify(book.name)}) owned by {book.owner}: {book.access}
+                <button class='btn btn-sm btn-link'><A href={`/books/${book.id}`}>Open</A></button>
+                <button class='btn btn-sm btn-error' onClick={areYouSure(() => deleteBook(book.id))}>Delete</button>
+              </li>
+            }</For>
+          </ul>
+      }</Show>
+      <button class='btn btn-sm btn-primary' onClick={showCreateBookModal}>
+        Create new book
+      </button>
+      <button class='btn btn-sm btn-primary' onClick={() => deleteIdentity()}>
+        Delete identity
+      </button>
+    </div>
     {modal}
   </>;
 }

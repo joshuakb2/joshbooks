@@ -6,6 +6,7 @@ import { authConfig } from "~/server/auth";
 
 export const getSessionData = query(async (): Promise<AuthSession | null> => {
   "use server";
+
   const event = getRequestEvent();
   if (!event) return null;
   return getSession(event.request, authConfig);

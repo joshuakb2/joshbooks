@@ -10,4 +10,5 @@ export default defineConfig({
     tailwindcss(),
   ],
   dev: { sourcemap: true },
+  clearScreen: false,
 });

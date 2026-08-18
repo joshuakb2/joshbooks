@@ -11,17 +11,30 @@ export const authConfig: StartAuthJSConfig = {
     Google({
       clientId: serverEnv.GOOGLE_ID,
       clientSecret: serverEnv.GOOGLE_SECRET,
+      authorization: {
+        params: {
+          prompt: "consent",
+          access_type: "offline",
+          response_type: "code",
+          scope: "openid email profile https://www.googleapis.com/auth/drive.appdata",
+        }
+      },
     }),
   ],
   debug: true,
   basePath: new URL(serverEnv.AUTH_URL!).pathname,
   callbacks: {
-    session: ({ session }): Session => ({
-      ...session,
-      user: {
-        ...session.user,
-        id: session.user.email,
-      },
-    }),
+    jwt: async ({ token, account }) => {
+      const { access_token, refresh_token } = account ?? {};
+      if (access_token && refresh_token) {
+        token.tokens = { access_token, refresh_token };
+      }
+      return token;
+    },
+    session: ({ session, token }): Session => {
+      session.user.id = session.user.email;
+      session.user.tokens = token.tokens;
+      return session;
+    },
   },
 };

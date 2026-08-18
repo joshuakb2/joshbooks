@@ -1,17 +1,17 @@
 import { action } from "@solidjs/router";
 import { getSessionData } from "~/queries/getSessionData";
-import { createNewBook } from "~/server/db";
+import { createBook } from "~/server/db";
+import { createNewBookFile } from "~/server/files";
 
-const createNewBookAction = action(async ({ name }: Omit<Parameters<typeof createNewBook>[0], 'owner'>) => {
+export const createNewBookAction = action(async ({ name }: Omit<Parameters<typeof createBook>[0], 'owner'>) => {
   'use server';
 
   const session = await getSessionData();
   if (!session?.user?.id) return;
 
-  return await createNewBook({
-    name,
-    owner: session.user.id,
-  });
-}, 'create-new-book');
+  const owner = session.user.id;
 
-export { createNewBookAction as createNewBook };
+  const { id, recipient } = await createBook({ name, owner });
+
+  await createNewBookFile({ id, name, owner, recipient });
+}, 'create-new-book');
