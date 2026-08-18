@@ -14,8 +14,13 @@
       packages.x86_64-linux.default = import nix/package.nix {
         inherit pkgs;
       };
+
       devShells.x86_64-linux.default = import nix/devShell.nix {
         inherit self pkgs;
+      };
+
+      nixosModules.default = import nix/module.nix {
+        inherit self;
       };
     };
 }
