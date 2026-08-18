@@ -20,11 +20,19 @@ const fixRequestUrl = (request: Request) => {
   try {
     const url = new URL(request.url);
 
-    const host = request.headers.get('x-forwarded-host');
-    if (host) url.host = host;
-
     const proto = request.headers.get('x-forwarded-proto');
     if (proto) url.protocol = proto;
+
+    const host = request.headers.get('x-forwarded-host');
+    if (host) {
+      url.host = host;
+
+      // If the host does not include a port, the url.host setter doesn't affect the url's port.
+      // That's wrong. We need to use the default port for the protocol if no port is specified.
+      if (!host.includes(':')) {
+        url.port = `${url.protocol === 'https:' ? 443 : 80}`;
+      }
+    }
 
     Object.defineProperty(request, 'url', { value: url.href });
   }
