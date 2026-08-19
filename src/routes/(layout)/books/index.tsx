@@ -1,8 +1,8 @@
 import { createEffect, createSignal, For, Show } from "solid-js";
 import { Title } from "@solidjs/meta";
 import { A, createAsync, useAction } from "@solidjs/router";
-import { assertNever } from '~/util';
-import { useModal } from "~/components/Modal";
+import { assertNever, unwrapOk, using } from '~/util';
+import { useModalStack } from "~/components/Modal";
 import { getBooksForUser } from "~/queries/getBooksForUser";
 import { getHasIdentity } from "~/queries/getHasIdentity";
 import { createNewBookAction } from "~/actions/createNewBook";
@@ -11,10 +11,11 @@ import { createIdentityAction } from "~/actions/createIdentity";
 import { deleteIdentityAction } from "~/actions/deleteIdentity";
 
 export default function BooksPage() {
-  const books = createAsync(() => getBooksForUser());
+  const booksResult = createAsync(() => getBooksForUser());
+  const books = () => using(booksResult(), b => b && unwrapOk(b));
   const createNewBook = useAction(createNewBookAction);
   const deleteBook = useAction(deleteBookAction);
-  const { modal, showModal } = useModal();
+  const { showModal } = useModalStack();
 
   const showCreateBookModal = async () => {
     const [name, setName] = createSignal('');
@@ -106,7 +107,6 @@ export default function BooksPage() {
         Delete identity
       </button>
     </div>
-    {modal}
   </>;
 }
 

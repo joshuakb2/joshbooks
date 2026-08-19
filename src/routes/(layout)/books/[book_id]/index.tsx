@@ -1,11 +1,11 @@
 import { Title } from "@solidjs/meta";
 import { A } from "@solidjs/router";
 import { type Component, createSignal, For, Show, type VoidComponent, useContext } from "solid-js";
-import { useModal } from "~/components/Modal";
 import { formatCommodity, NORMAL_BALANCE, type Account, type Book, type Commodity } from "~/types/book";
 import * as decimal from "~/types/decimal";
 import { assertNever } from "~/util";
 import BookContext from "../BookContext";
+import { useModalStack } from "~/components/Modal";
 
 const BookPage: VoidComponent = () => {
   const { book } = useContext(BookContext);
@@ -31,7 +31,7 @@ const Accounts: Component<AccountListRootProps> = props => {
   const accounts = () => book()?.accounts.items;
   const commodities = () => book()?.commodities.items;
 
-  const { modal, showModal } = useModal();
+  const { showModal } = useModalStack();
 
   const showNewAccountModal = async () => {
     const [name, setName] = createSignal('');
@@ -105,7 +105,6 @@ const Accounts: Component<AccountListRootProps> = props => {
         <AccountList book={book()} accounts={book().accounts.items.filter(x => x.parent == null)} />
         <button class='btn' onClick={showNewAccountModal}>Create a new account</button>
     </>}</Show>
-    {modal}
   </div>;
 };
 

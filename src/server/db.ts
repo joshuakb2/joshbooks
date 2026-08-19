@@ -1,6 +1,7 @@
 import { useStorage } from 'nitro/storage';
 import postgres from 'postgres';
 import { serverEnv } from '~/env/server';
+import { coalesceResult, Err, getAsyncErrorCatcher, Ok } from '~/util';
 
 const sql = postgres({
   host: serverEnv.PG_HOSTNAME,
@@ -10,21 +11,21 @@ const sql = postgres({
   debug: true,
 });
 
-export const init = async () => {
-  console.log('Initializing database');
-  try {
-    const initScript = await useStorage('assets:server').get('db_init.sql') as string;
+const catchErrors = getAsyncErrorCatcher('DB error');
 
-    // Transaction necessary for the postgres library to allow the init script to use BEGIN...COMMIT
-    await sql.begin(async sql => {
-      await sql.unsafe(initScript).simple();
-    });
-    console.log('Database initialized');
-  }
-  catch (e) {
-    console.log('Failed to initialize database:', e);
-  }
-};
+export const init = coalesceResult(catchErrors(async () => {
+  console.log('Initializing database');
+
+  const initScript = await useStorage('assets:server').get('db_init.sql') as string;
+
+  // Transaction necessary for the postgres library to allow the init script to use BEGIN...COMMIT
+  await sql.begin(async sql => {
+    await sql.unsafe(initScript).simple();
+  });
+  console.log('Database initialized');
+
+  return Ok();
+}));
 
 export type BookData = {
   id: number;
@@ -46,8 +47,8 @@ export const BOOK_ACCESS_LEVELS = {
   [K in BookAccess]: number;
 };
 
-export const getBooksForUser = async (id: string) => {
-  return await sql<BookData[]>`
+export const getBooksForUser = coalesceResult(catchErrors(async (id: string) => {
+  return Ok(await sql<BookData[]>`
     SELECT
       b.id,
       b.name,
@@ -63,15 +64,15 @@ export const getBooksForUser = async (id: string) => {
       b.owner = ${id}
     OR
       (g."user" = ${id} AND g.access >= 'read')
-  `;
-};
+  `);
+}));
 
 type createBookArgs = {
   name: string;
   owner: string;
 };
 
-export const createBook = async ({ name, owner }: createBookArgs) => {
+export const createBook = coalesceResult(catchErrors(async ({ name, owner }: createBookArgs) => {
   const [{ recipient } = {}] = await sql<{ recipient: string | null }[]>`
     SELECT
       recipient
@@ -81,7 +82,7 @@ export const createBook = async ({ name, owner }: createBookArgs) => {
       id = ${owner}
   `;
 
-  if (!recipient) throw new Error('User has no public key with which to encrypt a new book');
+  if (!recipient) return Err('no-recipient');
 
   const [{ id }] = await sql<{ id: number }[]>`
     INSERT INTO
@@ -92,15 +93,15 @@ export const createBook = async ({ name, owner }: createBookArgs) => {
       id
   `;
 
-  return { id, recipient };
-};
+  return Ok({ id, recipient });
+}));
 
 type deleteBookArgs = {
   book_id: number;
   user_id: string;
 };
 
-export const deleteBook = async ({ book_id, user_id }: deleteBookArgs) => {
+export const deleteBook = coalesceResult(catchErrors(async ({ book_id, user_id }: deleteBookArgs) => {
   await sql`
     DELETE FROM
       book AS b
@@ -109,14 +110,16 @@ export const deleteBook = async ({ book_id, user_id }: deleteBookArgs) => {
     AND
       b.owner = ${user_id}
   `;
-};
+
+  return Ok();
+}));
 
 type getBookDataArgs = {
   book_id: number;
   user_id: string;
 };
 
-export const getBookData = async ({ book_id, user_id }: getBookDataArgs) => {
+export const getBookData = coalesceResult(catchErrors(async ({ book_id, user_id }: getBookDataArgs) => {
   const bookDataRows = await sql<BookData[]>`
     SELECT
       id,
@@ -129,7 +132,7 @@ export const getBookData = async ({ book_id, user_id }: getBookDataArgs) => {
       id = ${book_id}
   `;
 
-  if (bookDataRows.length < 1) throw new Error('No such book');
+  if (bookDataRows.length < 1) return Err('no-such-book');
 
   const bookData = bookDataRows[0];
 
@@ -145,20 +148,20 @@ export const getBookData = async ({ book_id, user_id }: getBookDataArgs) => {
         "user" = ${user_id}
     `;
 
-    if (accessRows.length < 1) throw new Error('Access denied');
+    if (accessRows.length < 1) return Err('access-denied');
 
     bookData.access = accessRows[0].access;
   }
 
-  return bookData;
-};
+  return Ok(bookData);
+}));
 
 type createUserArgs = {
   user_id: string;
   name: string;
 };
 
-export const createUser = async ({ user_id, name }: createUserArgs) => {
+export const createUser = coalesceResult(catchErrors(async ({ user_id, name }: createUserArgs) => {
   await sql`
     INSERT INTO
       "user" (id, name)
@@ -169,13 +172,15 @@ export const createUser = async ({ user_id, name }: createUserArgs) => {
     SET
       name = EXCLUDED.name
   `;
-};
+
+  return Ok();
+}));
 
 type getUserRecipientArgs = {
   user_id: string;
 };
 
-export const getUserRecipient = async ({ user_id }: getUserRecipientArgs) => {
+export const getUserRecipient = coalesceResult(catchErrors(async ({ user_id }: getUserRecipientArgs) => {
   const [{ recipient } = { recipient: null }] = await sql<{ recipient: string | null }[]>`
     SELECT
       recipient
@@ -185,15 +190,15 @@ export const getUserRecipient = async ({ user_id }: getUserRecipientArgs) => {
       id = ${user_id}
   `;
 
-  return recipient;
-};
+  return Ok(recipient);
+}));
 
 type setUserRecipientArgs = {
   user_id: string;
   recipient: string | null;
 };
 
-export const setUserRecipient = async ({ user_id, recipient }: setUserRecipientArgs) => {
+export const setUserRecipient = coalesceResult(catchErrors(async ({ user_id, recipient }: setUserRecipientArgs) => {
   await sql`
     UPDATE
       "user"
@@ -202,4 +207,6 @@ export const setUserRecipient = async ({ user_id, recipient }: setUserRecipientA
     WHERE
       id = ${user_id}
   `;
-};
+
+  return Ok();
+}));

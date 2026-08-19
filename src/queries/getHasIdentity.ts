@@ -1,35 +1,31 @@
-import { query } from "@solidjs/router";
+import { query, redirect } from "@solidjs/router";
 import { getSessionData } from "./getSessionData";
 import { getIdentity } from "~/server/google";
 import { identityToRecipient } from "age-encryption";
 import { getUserRecipient } from "~/server/db";
+import { Err, Ok } from "~/util";
 
 export const getHasIdentity = query(async () => {
   'use server';
 
-  console.log('getting has identity');
-
   const session = await getSessionData();
-  console.log('got session', session);
 
-  if (!session?.user) return null;
+  if (!session?.user) throw redirect('/api/auth/signin');
 
   const { id: user_id, tokens } = session.user;
-  if (!user_id || !tokens) return null;
+  if (!user_id) return Err('missing-id');
+  if (!tokens) return Err('missing-tokens');
 
-  console.log('getting identity');
   const identity = await getIdentity(tokens);
-  console.log('got identity');
+  if (!identity.ok) return identity;
 
-  if (identity == null) return false;
+  if (identity.value == null) return false;
 
-  console.log('identity contents: ' + identity);
-  const recipient = await identityToRecipient(identity);
-  console.log('recipient contents: ' + recipient);
+  const recipient = await identityToRecipient(identity.value);
   const recordedRecipient = await getUserRecipient({ user_id });
-  console.log('recordedRecipient contents: ' + recordedRecipient);
+  if (!recordedRecipient.ok) return recordedRecipient;
 
-  if (recipient !== recordedRecipient) return false;
+  if (recipient !== recordedRecipient.value) return Ok(false);
 
-  return true;
+  return Ok(true);
 }, 'get-has-identity');

@@ -2,14 +2,16 @@
 
 import { serverEnv } from "~/env/server";
 import { join } from "node:path";
-import type { Book } from "~/types/book";
 import { bookParser, newBook } from "~/types/book";
 import { Encrypter, Decrypter } from "age-encryption";
 import { readFile, rm, writeFile } from "node:fs/promises";
+import { coalesceResult, getAsyncErrorCatcher, Ok } from "~/util";
 
 const ROOT = serverEnv.FILES_ROOT;
 
 const bookPath = (id: number) => join(ROOT, 'books', `${id}.json.age`);
+
+const catchErrors = getAsyncErrorCatcher('File error');
 
 type createNewBookFileArgs = {
   id: number;
@@ -18,7 +20,7 @@ type createNewBookFileArgs = {
   recipient: string;
 };
 
-export const createNewBookFile = async ({ id, name, owner, recipient }: createNewBookFileArgs) => {
+export const createNewBookFile = coalesceResult(catchErrors(async ({ id, name, owner, recipient }: createNewBookFileArgs) => {
   const book = newBook({ id, name, owner });
 
   const path = bookPath(id);
@@ -30,14 +32,16 @@ export const createNewBookFile = async ({ id, name, owner, recipient }: createNe
 
   // Fail if the file already exists
   await writeFile(path, ciphertext, { flag: 'wx' });
-};
+
+  return Ok();
+}));
 
 type openBookFileArgs = {
   id: number;
   identity: string;
 };
 
-export const openBookFile = async ({ id, identity }: openBookFileArgs): Promise<Book> => {
+export const openBookFile = coalesceResult(catchErrors(async ({ id, identity }: openBookFileArgs) => {
   const path = bookPath(id);
   const ciphertext = await readFile(path);
 
@@ -47,14 +51,15 @@ export const openBookFile = async ({ id, identity }: openBookFileArgs): Promise<
   const json = Buffer.from(await dec.decrypt(ciphertext)).toString('utf-8');
   const book = bookParser.parse(JSON.parse(json));
 
-  return book;
-};
+  return Ok(book);
+}));
 
 type deleteBookFileArgs = {
   id: number;
 };
 
-export const deleteBookFile = async ({ id }: deleteBookFileArgs) => {
+export const deleteBookFile = coalesceResult(catchErrors(async ({ id }: deleteBookFileArgs) => {
   const path = bookPath(id);
   await rm(path, { force: true });
-};
+  return Ok();
+}));

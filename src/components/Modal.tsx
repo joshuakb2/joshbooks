@@ -1,4 +1,5 @@
-import { type Component, createSignal, For, type JSX } from 'solid-js';
+import { type Component, createSignal, For, type JSX, createContext, useContext, onMount, onCleanup, createEffect } from 'solid-js';
+import { createMutable } from 'solid-js/store';
 import { twMerge } from 'tailwind-merge';
 
 type Option<T = undefined> = string | {
@@ -35,11 +36,29 @@ export type ModalProps<Options extends readonly OptionAnyResult[]> = {
   content: JSX.Element;
   options: Options;
   onSelect: (...args: SelectionOf<Options>) => void;
+  startShown?: boolean;
   ref?: JSX.DialogHtmlAttributes<HTMLDialogElement>['ref'];
 };
 
 export const Modal = (<Options extends readonly OptionAnyResult[]>(props: ModalProps<Options>) => {
-  return <dialog class='modal' ref={props.ref}>
+  let dialog: HTMLDialogElement | null;
+
+  onMount(() => {
+    if (props.startShown) {
+      dialog?.showModal();
+    }
+  });
+  onCleanup(() => {
+    dialog?.close();
+  });
+
+  return <dialog
+    class='modal'
+    ref={d => {
+      dialog = d;
+      if (typeof props.ref === 'function') props.ref(d);
+    }}
+  >
     <div class='modal-box flex flex-col justify-stretch items-stretch gap-5'>
       <h1 class='font-bold text-center text-lg'>{props.title}</h1>
       <div>{props.content}</div>
@@ -78,65 +97,9 @@ export const Modal = (<Options extends readonly OptionAnyResult[]>(props: ModalP
       </div>
     </div>
   </dialog>;
-
-  // return <Portal>
-  //   <div
-  //     data-mode={props.show ? 'show' : 'hide'}
-  //     class='fixed top-0 bottom-0 left-0 right-0 data-[mode=hide]:pointer-events-none'
-  //   >
-  //     <div
-  //       data-mode={props.show ? 'show' : 'hide'}
-  //       class='absolute top-0 bottom-0 left-0 right-0 transition-opacity transition-300 transition-ease-out bg-black/50 data-[mode=hide]:opacity-0'
-  //     />
-  //     <div
-  //       class='absolute top-0 bottom-0 left-0 right-0 flex flex-col justify-start items-center'
-  //     >
-  //       <div
-  //         data-mode={props.show ? 'show' : 'hide'}
-  //         class='flex flex-col justify-stretch items-stretch gap-5 p-4 mt-[20vh] rounded-2xl border border-black transition transition-opacity transition-transform transition-300 transition-ease-out data-[mode=show]:opacity-100 data-[mode=hide]:opacity-0 data-[mode=hide]:scale-95 bg-gray-200'
-  //       >
-  //         <h1 class='font-bold text-center text-lg'>{props.title}</h1>
-  //         <div>{props.content}</div>
-  //         <div class='flex flex-row justify-center gap-3'>
-  //           <For each={props.options}>{
-  //             option => {
-  //               let id: string;
-  //               let label: string;
-  //               let color: string | undefined;
-  //               let enabled: () => boolean;
-  //               if (typeof option === 'string') {
-  //                 id = label = option;
-  //                 enabled = () => true;
-  //               }
-  //               else {
-  //                 id = option.id;
-  //                 label = option.label ?? option.id;
-  //                 color = option.color;
-
-  //                 const { getResult } = option;
-  //                 enabled = getResult ? (() => getResult() != null) : (() => true);
-  //               }
-
-  //               return <Button
-  //                 color={color}
-  //                 onClick={() => {
-  //                   props.onSelect(...([
-  //                     id,
-  //                     typeof option === 'string' ? undefined : (option.getResult?.()?.result ?? undefined),
-  //                   ]) as unknown as SelectionOf<Options>);
-  //                 }}
-  //                 disabled={!enabled()}
-  //               >{label}</Button>;
-  //             }
-  //           }</For>
-  //         </div>
-  //       </div>
-  //     </div>
-  //   </div>
-  // </Portal>;
 }) satisfies Component<ModalProps<readonly OptionAnyResult[]>>;
 
-export type showModalArgs<Options extends readonly OptionAnyResult[]> = Omit<ModalProps<Options>, 'show' | 'onSelect'>;
+export type showModalArgs<Options extends readonly OptionAnyResult[]> = Omit<ModalProps<Options>, 'show' | 'onSelect' | 'startShown'>;
 
 export const useModal = () => {
   let dialog: HTMLDialogElement | undefined;
@@ -166,3 +129,43 @@ export const useModal = () => {
 
   return { modal, showModal };
 };
+
+const ModalStackContext = createContext<{
+  showModal: <const Options extends readonly OptionAnyResult[]>(props: showModalArgs<Options>) => Promise<SelectionOf<Options>>;
+}>({ showModal: () => { throw new Error('No context provider'); } });
+
+export const ModalStackContextProvider: Component<{ children: JSX.Element }> = props => {
+  const [stack, setStack] = createSignal<ModalProps<readonly OptionAnyResult[]>[]>([]);
+
+  const push = (props: ModalProps<readonly OptionAnyResult[]>) => setStack(stack => [...stack, props]);
+  const clear = (props: ModalProps<readonly OptionAnyResult[]>) => setStack(stack => stack.filter(x => x !== props));
+
+  const showModal = async <const Options extends readonly OptionAnyResult[]>(props: showModalArgs<Options>) => {
+    const { promise, resolve } = Promise.withResolvers<SelectionOf<Options>>();
+
+    const fullProps: ModalProps<Options> = {
+      ...props,
+      onSelect: (...args) => resolve(args),
+      startShown: true,
+    };
+
+    push(fullProps);
+
+    try {
+      return await promise;
+    } finally {
+      clear(fullProps);
+    }
+  };
+
+  return <>
+    <For each={stack()}>
+      {props => <Modal {...props} />}
+    </For>
+    <ModalStackContext.Provider value={{ showModal }}>
+      {props.children}
+    </ModalStackContext.Provider>
+  </>;
+};
+
+export const useModalStack = () => useContext(ModalStackContext);
